@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sing Buddy · Project code | Joya Stewart</title><link rel="stylesheet" href="style.css"><style>.codebook{max-width:900px}.codebook section{margin:3rem 0}.codebook h2{font-size:clamp(32px,5vw,56px);margin:8px 0 22px}.codebook summary strong{font:600 18px Arial;letter-spacing:0}.codebook pre{overflow-x:auto;padding:20px;background:#28233f;color:#fbf7ed;border-radius:6px;line-height:1.6;font-size:14px;tab-size:4}.codebook details p{max-width:70ch}</style></head><body><header><a class="word" href="index.html" data-edit-slot="0" data-shared-edit="title">Joya Stewart’s Project Portfolio</a><nav aria-label="Main"><a href="index.html#work" data-edit-slot="1">Projects</a><a href="index.html#about" data-edit-slot="3">About</a></nav><a class="navcontact" href="mailto:joyamirabai@gmail.com" data-edit-slot="4">Get in touch ↗</a></header><main><article class="wrap article codebook"><a class="back" href="sing-buddy.html" data-edit-slot="5">← Sing Buddy</a><h1 data-edit-slot="6">Sing Buddy Project Code</h1><p class="stand" data-edit-slot="7">Three ESP32 controllers handle playback, RFID scanning, and pitch feedback. Open a section to read or copy its code.</p><p style="margin:0" data-edit-slot="8"></p><section><small data-edit-slot="9">MICROPYTHON</small><h2 data-edit-slot="10">Speaker, buttons, and LED</h2><details><summary><strong data-edit-slot="11">Speaker output and controls</strong><i></i></summary><p data-edit-slot="12">Sets up the three active-low difficulty buttons and PWM output.</p><button type="button" class="btn">Copy code</button><pre><code>import network
+import espnow
+from machine import Pin, PWM, Timer
+from time import sleep
+import math
+
+led_ext = Pin(27, mode=Pin.OUT)
+button1 = Pin(26, Pin.IN, Pin.PULL_UP)
+button2 = Pin(14, Pin.IN, Pin.PULL_UP)
+button3 = Pin(12, Pin.IN, Pin.PULL_UP)
+duty_cycle = 100
+L1 = PWM(led_ext, freq=500, duty=duty_cycle)</code></pre></details><details><summary><strong data-edit-slot="13">Reference pitches and playback sequences</strong><i></i></summary><p data-edit-slot="14">Assigns frequencies in hertz, silences the speaker at startup, and defines the three scales and song sequence.</p><button type="button" class="btn">Copy code</button><pre><code>C3 = 131
+CS3 = 139
+D3 = 147
+DS3 = 156
+E3 = 165
+F3 = 175
+FS3 = 185
+G3 = 196
+GS3 = 208
+A3 = 220
+AS3 = 233
+B3 = 247
+C4 = 262
+CS4 = 277
+D4 = 294
+DS4 = 311
+E4 = 330
+F4 = 349
+FS4 = 370
+G4 = 392
+GS4 = 415
+A4 = 440
+AS4 = 466
+B4 = 494
+C5 = 523
+CS5 = 554
+D5 = 587
+DS5 = 622
+E5 = 659
+F5 = 698
+FS5 = 740
+G5 = 784
+GS5 = 831
+A5 = 880
+AS5 = 932
+B5 = 988
+C6 = 1047
+CS6 = 1109
+D6 = 1175
+DS6 = 1245
+E6 = 1319
+F6 = 1397
+FS6 = 1480
+G6 = 1568
+GS6 = 1661
+A6 = 1760
+AS6 = 1865
+B6 = 1976
+C7 = 2093
+CS7 = 2217
+D7 = 2349
+DS7 = 2489
+E7 = 2637
+F7 = 2794
+FS7 = 2960
+G7 = 3136
+GS7 = 3322
+A7 = 3520
+AS7 = 3729
+B7 = 3951
+C8 = 4186
+CS8 = 4435
+D8 = 4699
+DS8 = 4978
+
+speaker = PWM(Pin(27))
+speaker.duty(0)
+
+low_notes = [C4, D4, E4, F4, G4, A4, B4, C5]
+mid_notes = [C5, D5, E5, F5, G5, A5, B5, C6]
+high_notes = [C6, D6, E6, F6, G6, A6, B6, C7]
+music = [
+    A3,C4,E4,A4,B4,E4,G4,B4,C5,FS4,A4,C5,D5,D5,C5,D5,E5,E5,D5,C5,
+    B4,B4,A4,G4,G4,A4,A4,A3,C4,E4,A4,B4,E4,G4,B4,C5,FS4,A4,C5,D5,D5,C5,D5,E5,E5,D5,C5,
+    B4,B4,A4,G4,G4,A4,A4,A4,B4,C5,C5,C5,E5,D5,D5,D5,D5,C5,B4,C5,A4,A4,B4,C5,D5,E5,D5,D5,
+    B4,B4,G4,G4,A4,A4,A4,B4,C5,C5,C5,C5,C5,C5,B4,C5,B4,C5,B4,A4,A4,B4,C5,C5,C5,C5,C5,C5,
+    B4,C5,B4,C5,B4,A4,A4,A4,E5,D5,C5,D5,C5,A4,G4,G4,A4,A4,A4,A4,E4,E5,D5,C5,D5,C5,A4,G4,C5,G4,A4,A4
+]</code></pre></details><details><summary><strong data-edit-slot="15">Wireless receiver and note playback</strong><i></i></summary><p data-edit-slot="16">Starts ESP-NOW, sets each tone’s frequency and duration, and checks the buttons after receiving a message.</p><button type="button" class="btn">Copy code</button><pre><code>wlan = network.WLAN(network.STA_IF)
+wlan.active(True)
+e = espnow.ESPNow()
+e.active(True)
+print("ESP-NOW receiver ready...")
+
+def play(notes):
+    for note in notes:
+        speaker.freq(note)
+        speaker.duty(512)
+        sleep(0.5)
+        speaker.duty(0)
+        sleep(0.1)
+
+while True:
+    host, msg = e.recv()
+    if msg:
+        try:
+            decoded = msg.decode()
+        except:
+            decoded = str(msg)
+        print("Received from", host, ":", decoded)
+        play(music)
+        if button1.value() == 0:
+            play(low_notes)
+        elif button2.value() == 0:
+            play(mid_notes)
+        elif button3.value() == 0:
+            play(high_notes)
+        else:
+            speaker.duty(0)
+        sleep(0.1)</code></pre></details></section><section><small data-edit-slot="17">MicroPython · Report page 6</small><h2 data-edit-slot="18">RFID reader and LED</h2><details><summary><strong data-edit-slot="19">Radio, card reader, and status LED</strong><i></i></summary><p data-edit-slot="20">Registers the receiver as an ESP-NOW peer, initializes the MFRC522 reader over SPI, and sets the scan LED low.</p><button type="button" class="btn">Copy code</button><pre><code>import network
+import espnow
+import time
+from mfrc522 import MFRC522
+from time import sleep
+from machine import SPI, Pin
+
+sta = network.WLAN(network.STA_IF)
+sta.active(True)
+e = espnow.ESPNow()
+e.active(True)
+peer = b'\x14\x2b\x2f\xaf\xf2\xa0'
+e.add_peer(peer)
+e.send(peer, b"Starting...")
+spi = SPI(1, baudrate=1000000, polarity=0, phase=0)
+rdr = MFRC522(spi, 27, 4)
+led = Pin(15, Pin.OUT)
+led.value(0)
+print("Ready to scan...")</code></pre></details><details><summary><strong data-edit-slot="21">Read and transmit the fob ID</strong><i></i></summary><p data-edit-slot="22">Reads four UID bytes, formats them as hexadecimal text, and sends the encoded ID while illuminating the scan LED.</p><button type="button" class="btn">Copy code</button><pre><code>while True:
+    (stat, tag_type) = rdr.request(rdr.REQIDL)
+    if stat == rdr.OK:
+        (stat, raw_uid) = rdr.anticoll()
+        if stat == rdr.OK:
+            uid = "0x" + ''.join('{:02x}'.format(b) for b in raw_uid[:4])
+            print("Card UID:", uid)
+            led.value(1)
+            print("LED ON")
+            e.send(peer, uid.encode())
+            time.sleep(1.5)
+            led.value(0)</code></pre></details></section><section><small data-edit-slot="23">CircuitPython · Report pages 7–10</small><h2 data-edit-slot="24">Microphone, servo, buttons, and LEDs</h2><details><summary><strong data-edit-slot="25">Listening controls and microphone</strong><i></i></summary><p data-edit-slot="26">Configures four mode buttons, two feedback LEDs, and the analog microphone input.</p><button type="button" class="btn">Copy code</button><pre><code>import time
+import board
+import analogio
+import digitalio
+import microcontroller
+import ulab.numpy as np
+fft = np.fft
+import gc
+import pwmio
+
+button1 = digitalio.DigitalInOut(microcontroller.pin.GPIO14)
+button1.direction = digitalio.Direction.INPUT
+button1.pull = digitalio.Pull.UP
+
+button2 = digitalio.DigitalInOut(microcontroller.pin.GPIO27)
+button2.direction = digitalio.Direction.INPUT
+button2.pull = digitalio.Pull.UP
+
+button3 = digitalio.DigitalInOut(microcontroller.pin.GPIO12)
+button3.direction = digitalio.Direction.INPUT
+button3.pull = digitalio.Pull.UP
+
+button4 = digitalio.DigitalInOut(microcontroller.pin.GPIO15)
+button4.direction = digitalio.Direction.INPUT
+button4.pull = digitalio.Pull.UP
+
+led2 = digitalio.DigitalInOut(microcontroller.pin.GPIO25)
+led2.direction = digitalio.Direction.OUTPUT
+led1 = digitalio.DigitalInOut(microcontroller.pin.GPIO13)
+led1.direction = digitalio.Direction.OUTPUT
+mic = analogio.AnalogIn(board.A0)</code></pre></details><details><summary><strong data-edit-slot="27">Frequency lookup table</strong><i></i></summary><p data-edit-slot="28">Lists the prototype’s stored frequency centers and corresponding note labels. The matching function checks these values in the order shown.</p><button type="button" class="btn">Copy code</button><pre><code>frequency_table = [
+    {'center_freq': 343.3, 'symbol': 'E3'},
+    {'center_freq': 375, 'symbol': 'F3'},
+    {'center_freq': 750, 'symbol': 'FS3'},
+    {'center_freq': 406.3, 'symbol': 'G3'},
+    {'center_freq': 468.8, 'symbol': 'A3'},
+    {'center_freq': 500, 'symbol': 'B3'},
+    {'center_freq': 531.3, 'symbol': 'C4'},
+    {'center_freq': 593.8, 'symbol': 'D4'},
+    {'center_freq': 656.3, 'symbol': 'E4'},
+    {'center_freq': 718.8, 'symbol': 'F4'},
+    {'center_freq': 715.8, 'symbol': 'FS4'},
+    {'center_freq': 781.3, 'symbol': 'G4'},
+    {'center_freq': 875, 'symbol': 'A4'},
+    {'center_freq': 968.8, 'symbol': 'B4'},
+    {'center_freq': 1062.5, 'symbol': 'C5'},
+    {'center_freq': 1187.5, 'symbol': 'D5'},
+    {'center_freq': 1343.8, 'symbol': 'E5'},
+]</code></pre></details><details><summary><strong data-edit-slot="29">Pitch detection with the FFT</strong><i></i></summary><p data-edit-slot="30">Collects 256 samples, removes the mean, finds the strongest frequency bin, and looks for a table entry within 5% of that frequency.</p><button type="button" class="btn">Copy code</button><pre><code>def get_condensed_fft():
+    n_samples = 256
+    samples = []
+    for _ in range(n_samples):
+        val = mic.value * (3.3 / 65536)
+        samples.append(val)
+        time.sleep(1 / 8000)
+    data_array = np.array(samples, dtype=np.float)
+    data_array = data_array - np.mean(data_array)
+    real, imag = fft.fft(data_array)
+    magnitude = np.sqrt(real**2 + imag**2)
+    magnitude[0] = 0.0
+    gc.collect()
+    return magnitude[:len(magnitude) // 2].tolist()
+
+def get_highest_frequency(fft_data, sampling_rate=8000):
+    bin_size = sampling_rate / len(fft_data) / 2
+    max_index = int(np.argmax(fft_data))
+    return max_index * bin_size
+
+def find_symbol_for_frequency(highest_frequency, tolerance=0.05):
+    for entry in frequency_table:
+        center_freq = entry['center_freq']
+        if center_freq * (1 - tolerance) &lt;= highest_frequency &lt;= center_freq * (1 + tolerance):
+            return entry['symbol']
+    return "??"</code></pre></details><details><summary><strong data-edit-slot="31">Expected notes for each mode</strong><i></i></summary><p data-edit-slot="32">Defines the targets the listening controller checks for each exercise and for the song challenge.</p><button type="button" class="btn">Copy code</button><pre><code>easy_notes = ['B3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4']
+medium_notes = ['G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5']
+hard_notes = ['E3', 'F3', 'G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'D5', 'E5']
+music = ["A3", "C4", "E4", "A3", "B3", "E3", "G3", "B3", "C4", "FS3", "A3", "C4", "D4", "D4", "C4", "D4", "E4", "E4", "D4", "C4", "B3", "B3", "A3", "G3", "G3", "A3", "A3"]</code></pre></details><details><summary><strong data-edit-slot="33">Medium mode</strong><i></i></summary><p data-edit-slot="34">Button 2 selects the medium exercise. Each target gets an eight-second listening window, with LED feedback after each one-second check.</p><button type="button" class="btn">Copy code</button><pre><code>if not button2.value:
+    print('MEDIUM MODE:')
+    for medium in medium_notes:
+        print("\n🔊 Listening for:", medium)
+        heard = False
+        start_time = time.monotonic()
+        while time.monotonic() - start_time &lt; 8:
+            second_start = time.monotonic()
+            correct_this_second = False
+            while time.monotonic() - second_start &lt; 1.0:
+                fft_data = get_condensed_fft()
+                highest_freq = get_highest_frequency(fft_data)
+                detected = find_symbol_for_frequency(highest_freq)
+                if detected == medium:
+                    correct_this_second = True
+            if correct_this_second:
+                print(f"  ✅ Heard {medium} this second!")
+                heard = True
+                led1.value = True
+                time.sleep(0.2)
+                led1.value = False
+            else:
+                print(f"  ❌ {medium} not heard this second.")
+                led2.value = True
+                time.sleep(0.2)
+                led2.value = False
+        if not heard:
+            print(f"  ❌ {medium} not heard at all.")</code></pre></details><details><summary><strong data-edit-slot="35">Hard mode</strong><i></i></summary><p data-edit-slot="36">Button 3 selects the hard exercise. Each target gets an eight-second listening window, with LED feedback after each one-second check.</p><button type="button" class="btn">Copy code</button><pre><code>if not button3.value:
+    print('HARD MODE:')
+    for hard in hard_notes:
+        print("\n🔊 Listening for:", hard)
+        heard = False
+        start_time = time.monotonic()
+        while time.monotonic() - start_time &lt; 8:
+            second_start = time.monotonic()
+            correct_this_second = False
+            while time.monotonic() - second_start &lt; 1.0:
+                fft_data = get_condensed_fft()
+                highest_freq = get_highest_frequency(fft_data)
+                detected = find_symbol_for_frequency(highest_freq)
+                if detected == hard:
+                    correct_this_second = True
+            if correct_this_second:
+                print(f"  ✅ Heard {hard} this second!")
+                heard = True
+                led1.value = True
+                time.sleep(0.2)
+                led1.value = False
+            else:
+                print(f"  ❌ {hard} not heard this second.")
+                led2.value = True
+                time.sleep(0.2)
+                led2.value = False
+        if not heard:
+            print(f"  ❌ {hard} not heard at all.")</code></pre></details><details><summary><strong data-edit-slot="37">Game mode</strong><i></i></summary><p data-edit-slot="38">Button 4 starts the song exercise. Each note gets a three-second listening window. A missed note triggers the servo to press and release the bracelet controller.</p><button type="button" class="btn">Copy code</button><pre><code>if not button4.value:
+    print('GAME MODE:')
+    for game in music:
+        print("\n🔊 Listening for:", game)
+        heard = False
+        start_time = time.monotonic()
+        while time.monotonic() - start_time &lt; 3:
+            second_start = time.monotonic()
+            correct_this_second = False
+            while time.monotonic() - second_start &lt; 1.0:
+                fft_data = get_condensed_fft()
+                highest_freq = get_highest_frequency(fft_data)
+                detected = find_symbol_for_frequency(highest_freq)
+                if detected == game:
+                    correct_this_second = True
+            if correct_this_second:
+                print(f"  ✅ Heard {game} this second!")
+                heard = True
+                led1.value = True
+                time.sleep(0.2)
+                led1.value = False
+            else:
+                print(f"  ❌ {game} not heard this second.")
+                led2.value = True
+                time.sleep(0.2)
+                led2.value = False
+        if not heard:
+            if not heard:
+                print(f"  ❌ {game} not heard at all.")
+                pwm = pwmio.PWMOut(microcontroller.pin.GPIO33, frequency=50)
+
+                def write_servo_angle(angle):
+                    min_duty = int(65535 * 0.025)
+                    max_duty = int(65535 * 0.125)
+                    duty = int(min_duty + (angle / 180) * (max_duty - min_duty))
+                    pwm.duty_cycle = duty
+
+                for angle in range(180, 85, -5):
+                    write_servo_angle(angle)
+                    time.sleep(0.05)
+                for angle in range(85, 180, 5):
+                    write_servo_angle(angle)
+                    time.sleep(0.05)
+                pwm.deinit()
+
+time.sleep(0.1)</code></pre></details></section></article></main><footer><div class="wrap"><small data-edit-slot="24">CONTACT</small><h2 data-edit-slot="25" data-shared-edit="contact">Let’s connect.</h2><a href="mailto:joyamirabai@gmail.com" data-edit-slot="26">joyamirabai@gmail.com ↗</a><div class="footline"><span data-edit-slot="27">Joya Stewart · Mechanical Engineering</span><a href="assets/joya-stewart-resume.pdf" data-edit-slot="28">Résumé ↗</a></div></div></footer><script src="copy-code.js" defer></script><script src="editor.js" defer></script></body></html>
